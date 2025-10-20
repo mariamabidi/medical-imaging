@@ -1,0 +1,7 @@
+Model: swin_modelglioma: {'precision': 1.0, 'recall': 0.9918032786885246, 'f1-score': 0.9958847736625515, 'support': 244.0}
+meningioma: {'precision': 0.9826839826839827, 'recall': 0.9869565217391304, 'f1-score': 0.9848156182212582, 'support': 230.0}
+notumor: {'precision': 1.0, 'recall': 0.9967845659163987, 'f1-score': 0.998389694041868, 'support': 311.0}
+pituitary: {'precision': 0.988929889298893, 'recall': 0.9962825278810409, 'f1-score': 0.9925925925925926, 'support': 269.0}
+accuracy: 0.9933586337760911
+macro avg: {'precision': 0.9929034679957189, 'recall': 0.9929567235562737, 'f1-score': 0.9929206696295675, 'support': 1054.0}
+weighted avg: {'precision': 0.9933960685376834, 'recall': 0.9933586337760911, 'f1-score': 0.9933681966024481, 'support': 1054.0}

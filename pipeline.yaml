@@ -1,0 +1,239 @@
+# PIPELINE DEFINITION
+# Name: brain-tumor-classification-pipeline
+# Description: End-to-end pipeline for brain tumor MRI classification
+# Inputs:
+#    model_name: str [Default: 'vit']
+# Outputs:
+#    evaluate-op-output_metrics: system.Metrics
+#    train-op-output_metrics: system.Metrics
+components:
+  comp-evaluate-op:
+    executorLabel: exec-evaluate-op
+    inputDefinitions:
+      artifacts:
+        input_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+    outputDefinitions:
+      artifacts:
+        output_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+  comp-preprocess-op:
+    executorLabel: exec-preprocess-op
+    outputDefinitions:
+      artifacts:
+        output_data:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+  comp-train-op:
+    executorLabel: exec-train-op
+    inputDefinitions:
+      artifacts:
+        input_data:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        model_name:
+          defaultValue: vit
+          isOptional: true
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        output_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+        output_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+deploymentSpec:
+  executors:
+    exec-evaluate-op:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - evaluate_op
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'torch' 'torchvision'\
+          \ 'scikit-learn' 'mlflow' 'matplotlib' 'seaborn' 'numpy' && \"$0\" \"$@\"\
+          \n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef evaluate_op(\n    input_model: Input[Model],\n    output_metrics:\
+          \ Output[Metrics]\n):\n    \"\"\"\n    Evaluates the trained model using\
+          \ your evaluate_full.py script.\n    \"\"\"\n    print(\"\U0001F4CA Running\
+          \ evaluation...\")\n    subprocess.run([\"python\", \"src/evaluate_full.py\"\
+          ], check=True)\n\n    # Dummy metric for Kubeflow\n    output_metrics.log_metric(\"\
+          evaluation_complete\", 1.0)\n\n"
+        image: python:3.10-slim
+    exec-preprocess-op:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - preprocess_op
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'torch' 'torchvision'\
+          \ 'numpy' 'pillow' 'mlflow' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef preprocess_op(output_data: Output[Dataset]):\n    \"\"\"\n  \
+          \  Runs your data_preprocessing.py script.\n    Produces preprocessed data\
+          \ for training.\n    \"\"\"\n    print(\"\U0001F4E6 Running data preprocessing...\"\
+          )\n\n    # Run the preprocessing script inside src/\n    subprocess.run([\"\
+          python\", \"src/data_preprocessing.py\"], check=True)\n\n    # Dummy file\
+          \ for Kubeflow output tracking\n    with open(output_data.path, \"w\") as\
+          \ f:\n        f.write(\"Preprocessing completed successfully.\")\n\n"
+        image: python:3.10-slim
+    exec-train-op:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_op
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'torch' 'torchvision'\
+          \ 'timm' 'mlflow' 'numpy' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train_op(\n    input_data: Input[Dataset],\n    output_model:\
+          \ Output[Model],\n    output_metrics: Output[Metrics],\n    model_name:\
+          \ str = \"vit\"\n):\n    \"\"\"\n    Trains the specified model (ResNet,\
+          \ ViT, Swin, etc.)\n    by calling its respective training script inside\
+          \ src/.\n    \"\"\"\n    print(f\"\U0001F680 Training {model_name} model...\"\
+          )\n\n    # Dynamically call your training file (e.g., src/train_vit.py or\
+          \ src/train_swin.py)\n    subprocess.run([\"python\", f\"src/train_{model_name}.py\"\
+          ], check=True)\n\n    # Log dummy model output\n    with open(output_model.path,\
+          \ \"w\") as f:\n        f.write(f\"{model_name} model trained successfully.\"\
+          )\n\n    # Log dummy metric\n    output_metrics.log_metric(\"train_complete\"\
+          , 1.0)\n\n"
+        image: python:3.10-slim
+pipelineInfo:
+  description: End-to-end pipeline for brain tumor MRI classification
+  name: brain-tumor-classification-pipeline
+root:
+  dag:
+    outputs:
+      artifacts:
+        evaluate-op-output_metrics:
+          artifactSelectors:
+          - outputArtifactKey: output_metrics
+            producerSubtask: evaluate-op
+        train-op-output_metrics:
+          artifactSelectors:
+          - outputArtifactKey: output_metrics
+            producerSubtask: train-op
+    tasks:
+      evaluate-op:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-evaluate-op
+        dependentTasks:
+        - train-op
+        inputs:
+          artifacts:
+            input_model:
+              taskOutputArtifact:
+                outputArtifactKey: output_model
+                producerTask: train-op
+        taskInfo:
+          name: evaluate-op
+      preprocess-op:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-preprocess-op
+        taskInfo:
+          name: preprocess-op
+      train-op:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train-op
+        dependentTasks:
+        - preprocess-op
+        inputs:
+          artifacts:
+            input_data:
+              taskOutputArtifact:
+                outputArtifactKey: output_data
+                producerTask: preprocess-op
+          parameters:
+            model_name:
+              componentInputParameter: model_name
+        taskInfo:
+          name: train-op
+  inputDefinitions:
+    parameters:
+      model_name:
+        defaultValue: vit
+        isOptional: true
+        parameterType: STRING
+  outputDefinitions:
+    artifacts:
+      evaluate-op-output_metrics:
+        artifactType:
+          schemaTitle: system.Metrics
+          schemaVersion: 0.0.1
+      train-op-output_metrics:
+        artifactType:
+          schemaTitle: system.Metrics
+          schemaVersion: 0.0.1
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.7.0

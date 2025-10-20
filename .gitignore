@@ -1,0 +1,33 @@
+# Virtual environment
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Data and model files
+data/
+best_models/
+# Virtual environment
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Data and model files
+data/
+best_models/
+*.pth
+*.pt
+*.pickle
+*.pkl
+
+# Logs and results
+mlruns/
+results/
+*.log
+
+# System files
+.DS_Store
+.idea/
+.ipynb_checkpoints/
+
